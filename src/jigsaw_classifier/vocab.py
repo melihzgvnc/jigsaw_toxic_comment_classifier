@@ -13,7 +13,7 @@ class Tokenizer:
         self.build_vocab(unique_words)
 
     def __len__(self):
-        return len(word2id)
+        return len(self.word2id)
     
     def load_text_data(self):
         data = pd.read_csv(self.data_path)
@@ -38,15 +38,15 @@ class Tokenizer:
     def encode(self, seq):
         encoded_seq = []
         for word in seq:
-            encoded_seq.append(self.word2idx[word])
+            encoded_seq.append(self.word2id.get(word, self.word2id['<UNK>']))
         
         return encoded_seq
 
     def decode(self, seq):
         decoded_seq = []
         for word_id in seq:
-            decoded_seq.append(self.id2word[word_id])
+            decoded_seq.append(self.id2word.get(word_id, '<UNK>'))
 
         return decoded_seq
 
-    
+tokenizer = Tokenizer()
