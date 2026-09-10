@@ -2,7 +2,7 @@ import pandas as pd
 from pathlib import Path
 import string
 
-DEFAULT_DATA_PATH = Path(__file__).parent.parent.parent/'data'/'train.csv'
+DEFAULT_DATA_PATH = Path(__file__).parent.parent.parent/'data'/'train_split.csv'
 
 class Tokenizer:
         
@@ -11,9 +11,7 @@ class Tokenizer:
         self.load_text_data()
         unique_words = self.preprocess()
         self.build_vocab(unique_words)
-
-    def __len__(self):
-        return len(self.word2id)
+        self.vocab_size = len(self.word2id)
     
     def load_text_data(self):
         data = pd.read_csv(self.data_path)
