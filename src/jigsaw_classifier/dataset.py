@@ -18,12 +18,15 @@ def target_transform(df):
     
 
 class JigsawDataset(Dataset):
-    def __init__(self, data_path=None, data_size=6000):
+    def __init__(self, data_path=None, data_size=None):
         data = pd.read_csv(data_path)
+        data_size = len(data) if data_size == None else data_size 
         data = data.sample(n=data_size, random_state=42)
         self.samples = data['comment_text']
         self.labels = target_transform(data)
         self.vocab_size = tokenizer.vocab_size
+        self.num_labels = len(self.labels[0])
+        assert self.num_labels == 6
 
     def __len__(self):
         return len(self.labels)

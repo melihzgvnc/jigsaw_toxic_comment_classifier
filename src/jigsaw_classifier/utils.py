@@ -1,9 +1,11 @@
+import mlflow
 import torch
 import torch.nn.functional as F
 from torch.utils.data import random_split
 import numpy as np
 from sklearn.metrics import precision_recall_curve, f1_score
 
+from jigsaw_classifier.model import JigsawClassifier
 
 def custom_collate_fn(data): # data -> [(tokens, label, len)...]
     max_len = max([item[-1] for item in data])    
@@ -32,6 +34,36 @@ def calculate_pos_weight(dataset):
 
     return torch.tensor(pos_weight)
 
+from sklearn.metrics import precision_recall_curve
+import numpy as np
+
+def find_best_thresholds(y_true_val, y_probs_val, num_classes):
+    """
+    y_true_val: (N, num_classes) binary ground truth on VALIDATION set
+    y_probs_val: (N, num_classes) sigmoid outputs (probabilities, not logits) on VALIDATION set
+    """
+    best_thresholds = np.zeros(num_classes)
+    
+    for c in range(num_classes):
+        precision, recall, thresholds = precision_recall_curve(
+            y_true_val[:, c], y_probs_val[:, c]
+        )
+        # precision_recall_curve returns len(thresholds) = len(precision) - 1
+        # drop the last precision/recall point (corresponds to no threshold)
+        precision, recall = precision[:-1], recall[:-1]
+        
+        f1_scores = np.divide(
+            2 * precision * recall,
+            precision + recall,
+            out=np.zeros_like(precision),
+            where=(precision + recall) != 0
+        )
+        
+        best_idx = np.argmax(f1_scores)
+        best_thresholds[c] = thresholds[best_idx]
+    
+    return torch.tensor(best_thresholds)
+
 
 def calculate_sigmoid_thresholds(model, val_loader):
     model.eval()
@@ -51,3 +83,18 @@ def calculate_sigmoid_thresholds(model, val_loader):
 
     best_thresholds = torch.tensor(best_thresholds)
     return best_thresholds
+
+
+class ModelWrapper(mlflow.pyfunc.PythonModel):
+    def load_context(self, context):
+        params = context.model_config
+        self.model = JigsawClassifier(params["vocab_size"], params["embed_dim"], params["hidden_dim"])
+        state_dict = torch.load(context.artifacts["model_path"])
+        self.model.load_state_dict(state_dict)
+        self.model.eval()
+
+    def predict(self, context, model_input, params=None):
+        with torch.no_grad():
+            x = torch.tensor(model_input['x'])
+            length = torch.tensor(model_input['length'])
+            return self.model(x, length).numpy()
