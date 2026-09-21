@@ -1,6 +1,7 @@
 import pandas as pd
 from pathlib import Path
 import string
+from collections import Counter
 
 DEFAULT_DATA_PATH = Path(__file__).parent.parent.parent/'data'/'train_split.csv'
 
@@ -22,13 +23,18 @@ class Tokenizer:
         translator = str.maketrans('', '', string.punctuation)
         words_cleaned = [word.translate(translator) for word in words]
 
-        unique_words = sorted(set(w for w in words_cleaned if w)) # Sorted so it is deterministic. Prevent hash-randomization
+        words_with_freqs = Counter(words_cleaned)
+        min_freq = 3
+        # Sorted so it is deterministic. Prevent hash-randomization
+        unique_words = sorted([w for w, freq in words_with_freqs.items() if freq > min_freq]) 
+        unique_words = ['<NUM>' if word.isdigit() else word for word in unique_words]
+        #unique_words = sorted(set(w for w in words_cleaned if w)) # Sorted so it is deterministic. Prevent hash-randomization
 
         return unique_words
 
     def build_vocab(self, unique_words):
-        self.word2id = {'<PAD>': 0, '<UNK>': 1}
-        self.id2word = {0: '<PAD>', 1: '<UNK>'}
+        self.word2id = {'<PAD>': 0, '<UNK>': 1, '<NUM>': 2}
+        self.id2word = {0: '<PAD>', 1: '<UNK>', 2: '<NUM>'}
         for idx, word in enumerate(unique_words, start=2):
             self.word2id[word] = idx
             self.id2word[idx] = word
