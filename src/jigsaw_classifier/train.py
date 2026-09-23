@@ -14,21 +14,21 @@ from jigsaw_classifier.model import JigsawClassifier
 # Creates a new MLFlow Experiment if it does not exist
 mlflow.set_experiment("Jigsaw Experiment")
 # Enables system metrics logging
-# mlflow.enable_system_metrics_logging()
-# mlflow.set_system_metrics_sampling_interval(1)
+mlflow.enable_system_metrics_logging()
+mlflow.set_system_metrics_sampling_interval(1)
 
 torch.manual_seed(42)
 random.seed(42)
 
 params = {
     "epochs": 50,
-    "learning_rate": 1e-3,
-    "batch_size": 256,
+    "learning_rate": 2e-3,
+    "batch_size": 512,
     "optimizer": "AdamW",
     "model_type": "BiLSTM-w/Pooling",
     "embed_dim": 128,
     "hidden_dim": 256,
-    "train_data_size": 100000
+    "train_data_size": 50000
 }
 
 train_dataset = JigsawDataset(data_path='../../data/train_split.csv', data_size=params["train_data_size"])
@@ -53,6 +53,7 @@ num_epochs = params['epochs']
 
 scheduler = CosineAnnealingLR(optimizer=optimizer, T_max=num_epochs)
 
+train_macro_f1 = MultilabelF1Score(num_labels=train_dataset.num_labels, average='macro')
 val_macro_f1 = MultilabelF1Score(num_labels=val_dataset.num_labels, average='macro')
 
 # Extract input example for MLFlow model
@@ -65,7 +66,7 @@ for (x, y, length) in val_loader:
 
 
 def train():
-    with mlflow.start_run(run_name='model-pooling-posweight-dropout-lrscheduler') as run:
+    with mlflow.start_run(run_name='model-with-noisy-data-removed') as run:
         # Log training params
         mlflow.log_params(params)
 
@@ -86,12 +87,15 @@ def train():
                 optimizer.zero_grad()
                 loss.backward()
 
+                train_macro_f1.update(torch.sigmoid(logits), y.float())
+
                 gradient_norm = nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
                 mlflow.log_metric("raw_gradient_norm", gradient_norm.item(), step=epoch)
 
                 optimizer.step()
 
             train_loss = sum(train_loss) / len(train_loss)
+            train_macro_f1_res = train_macro_f1.compute()
 
             model.eval()
             val_macro_f1.reset()
@@ -117,6 +121,7 @@ def train():
             mlflow.log_metrics(
                 {
                     "train_loss": train_loss,
+                    "train_macro_f1": train_macro_f1_res,
                     "val_loss": val_loss,
                     "val_macro_f1": val_macro_f1_res
                 },
@@ -148,7 +153,7 @@ def train():
             )
 
         mlflow.pyfunc.log_model(
-            name="model",
+            name="final_model",
             python_model=ModelWrapper(),
             model_config={
                 "vocab_size": params["vocab_size"],
