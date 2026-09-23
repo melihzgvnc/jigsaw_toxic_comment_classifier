@@ -10,6 +10,7 @@ class JigsawClassifier(nn.Module):
         self.dropout = nn.Dropout(0.3)
 
     def forward(self, x, seq_len):
+        #print(x.min().item(), x.max().item(), self.embedding.num_embeddings)
         x = self.embedding(x)
         x = nn.utils.rnn.pack_padded_sequence(x, seq_len, batch_first=True, enforce_sorted=False)
         packed_output, (h_n, c_n) = self.bilstm(x)

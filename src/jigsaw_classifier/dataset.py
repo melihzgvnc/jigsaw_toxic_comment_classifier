@@ -9,6 +9,7 @@ def transform(seq):
     words = seq.lower().split()
     translator = str.maketrans('', '', string.punctuation)
     words_cleaned = [word.translate(translator) for word in words]
+    words_cleaned = ['<NUM>' if word.isdigit() else word for word in words_cleaned]
     encoded_seq = tokenizer.encode(words_cleaned)
     return encoded_seq
 

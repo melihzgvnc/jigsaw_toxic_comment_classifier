@@ -26,8 +26,8 @@ class Tokenizer:
         words_with_freqs = Counter(words_cleaned)
         min_freq = 3
         # Sorted so it is deterministic. Prevent hash-randomization
-        unique_words = sorted([w for w, freq in words_with_freqs.items() if freq > min_freq]) 
-        unique_words = ['<NUM>' if word.isdigit() else word for word in unique_words]
+        unique_words = sorted(set([w for w, freq in words_with_freqs.items() if freq > min_freq])) 
+        #unique_words = ['<NUM>' if word.isdigit() else word for word in unique_words]
         #unique_words = sorted(set(w for w in words_cleaned if w)) # Sorted so it is deterministic. Prevent hash-randomization
 
         return unique_words
@@ -35,20 +35,26 @@ class Tokenizer:
     def build_vocab(self, unique_words):
         self.word2id = {'<PAD>': 0, '<UNK>': 1, '<NUM>': 2}
         self.id2word = {0: '<PAD>', 1: '<UNK>', 2: '<NUM>'}
-        for idx, word in enumerate(unique_words, start=2):
+        for idx, word in enumerate(unique_words, start=3):
+            if word.isdigit():
+                self.word2id[word] = self.word2id['<NUM>']
+                continue
             self.word2id[word] = idx
             self.id2word[idx] = word
 
-    def encode(self, seq):
+    def encode(self, seq: list) -> list:
         encoded_seq = []
         for word in seq:
+            if word.isdigit():
+                encoded_seq.append(self.word2id['<NUM>'])
+                continue
             encoded_seq.append(self.word2id.get(word, self.word2id['<UNK>']))
         
         return encoded_seq
 
-    def decode(self, seq):
+    def decode(self, seq: list) -> list:
         decoded_seq = []
-        for word_id in seq:
+        for word_id in seq.tolist():
             decoded_seq.append(self.id2word.get(word_id, '<UNK>'))
 
         return decoded_seq
